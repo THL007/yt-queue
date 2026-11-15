@@ -1,0 +1,13 @@
+name = "yt-queue-api"
+main = "src/index.js"
+compatibility_date = "2026-11-01"
+
+[vars]
+WEBHOOK_URL = "https://signal.openbot.run/v1/webhooks/0bb33e73-e5e5-4b71-b7fd-ec6b3ffe755c"
+ALLOWED_ORIGIN = "*"
+
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "yt-queue"
+
+# Secrets (set with `wrangler secret put` or the API): APP_TOKEN, WEBHOOK_SECRET

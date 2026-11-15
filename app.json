@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "YT Queue",
+    "slug": "yt-queue",
+    "version": "1.0.0",
+    "scheme": "ytqueue",
+    "orientation": "default",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "web": {
+      "output": "single",
+      "bundler": "metro",
+      "favicon": "./assets/favicon.png",
+      "name": "YT Queue",
+      "shortName": "YT Queue",
+      "themeColor": "#0f0c0a",
+      "backgroundColor": "#0f0c0a"
+    },
+    "experiments": {
+      "baseUrl": "/yt-queue",
+      "typedRoutes": false
+    },
+    "plugins": ["expo-router"]
+  }
+}
