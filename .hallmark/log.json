@@ -1,0 +1,93 @@
+[
+ {
+  "scope": "app",
+  "shape": "app screen",
+  "theme": "darkroom",
+  "axes": "dark/display-condensed/chromatic-amber",
+  "hero": "none",
+  "nav": "top bar, wordmark and three tabs",
+  "footer": "none",
+  "imagery": "product: clip thumbnails and the preview",
+  "photos": [],
+  "entry": "none",
+  "sections": [
+   "queue: overview, board, table, gallery",
+   "editor: preview, inspector, timeline",
+   "new video",
+   "settings"
+  ],
+  "signature": "the editor timeline with an amber playhead",
+  "waived": [],
+  "prompt": "YT Queue: copy of Vlog Queue with a timeline editor and export",
+  "date": "2026-11-15",
+  "mode": "build"
+ },
+ {
+  "scope": "app",
+  "shape": "app screen",
+  "theme": "halftone",
+  "axes": "light/slab-serif/warm",
+  "hero": "none",
+  "nav": "top bar, wordmark and three tabs",
+  "footer": "none",
+  "imagery": "product: rendered video thumbnails",
+  "photos": [],
+  "entry": "none",
+  "sections": [
+   "queue: overview, board, table, gallery",
+   "new video: type tiles, More types disclosure, custom and blank, format, library",
+   "settings"
+  ],
+  "signature": "render sheet as a well, percent in Ultra on the spot, one dot-screen strip",
+  "waived": [],
+  "prompt": "change theme and font again, more video types behind a collapsed menu, custom and blank types",
+  "date": "2026-11-15",
+  "mode": "build"
+ },
+ {
+  "scope": "app",
+  "shape": "app screen",
+  "theme": "atelier",
+  "axes": "light/roman-serif/cool",
+  "hero": "none",
+  "nav": "top bar, wordmark and three tabs",
+  "footer": "none",
+  "imagery": "product: rendered video thumbnails",
+  "photos": [],
+  "entry": "none",
+  "sections": [
+   "queue: overview, board, table, gallery",
+   "new video: type list, format, library",
+   "settings"
+  ],
+  "signature": "render sheet on cotton stock with slate meter",
+  "waived": [
+   "fonts: Google only by request, Piazzolla for Sentient"
+  ],
+  "prompt": "switch theme, add video types, more queue layouts",
+  "date": "2026-11-15",
+  "mode": "build"
+ },
+ {
+  "scope": "app",
+  "shape": "app screen",
+  "theme": "midnight",
+  "axes": "dark/grotesk-sans/cool",
+  "hero": "none",
+  "nav": "top bar, wordmark and three tabs",
+  "footer": "none",
+  "imagery": "product: rendered video thumbnails",
+  "photos": [],
+  "entry": "none",
+  "sections": [
+   "queue",
+   "new video",
+   "settings"
+  ],
+  "signature": "render sheet with meter and stage",
+  "waived": [],
+  "prompt": "PWA to upload b-roll to R2, pick a format, send to Vlog Boy, see done videos and the one rendering",
+  "date": "2026-11-14",
+  "mode": "build"
+ }
+]
