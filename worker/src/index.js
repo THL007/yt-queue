@@ -129,6 +129,8 @@ function fireExport(env, job) {
 const EDIT_LIMIT = 300 * 1024;
 const num = (v, lo, hi, d) => { const n = Number(v); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : d; };
 const str = (v, n) => (v == null ? "" : String(v)).slice(0, n);
+const TRANSITIONS = ["fade", "dissolve", "fadeblack", "fadewhite", "slideleft", "slideright", "slideup", "slidedown", "wipeleft", "wiperight", "circleopen", "circleclose", "zoomin", "hblur", "pixelize", "radial", "smoothleft", "squeezeh"];
+const TEXT_FONTS = ["barlow", "anton", "bebas", "marker", "pacifico", "archivo"];
 function cleanEdit(e) {
   if (!e || typeof e !== "object" || !Array.isArray(e.clips)) throw new Error("edit needs a clips array");
   const clips = e.clips.slice(0, 300).filter((c) => c && validKey(c.key) && c.key.startsWith("broll/")).map((c, i) => {
@@ -137,23 +139,32 @@ function cleanEdit(e) {
     const max = kind === "image" ? 3600 : duration || 36000;
     const inP = num(c.in, 0, max, 0);
     const outP = num(c.out, inP + 0.1, kind === "image" ? 3600 : max, inP + 3);
-    return { id: str(c.id || `c${i}`, 40), key: c.key, kind, duration, in: inP, out: outP, volume: num(c.volume, 0, 2, 1), muted: Boolean(c.muted) };
+    const tr = c.transition && TRANSITIONS.includes(c.transition.type) ? { type: c.transition.type, duration: num(c.transition.duration, 0.1, 3, 0.6) } : null;
+    return { id: str(c.id || `c${i}`, 40), key: c.key, kind, duration, in: inP, out: outP, volume: num(c.volume, 0, 2, 1), muted: Boolean(c.muted), detached: Boolean(c.detached), transition: tr };
   });
   const texts = (Array.isArray(e.texts) ? e.texts : []).slice(0, 100).map((t, i) => ({
     id: str(t.id || `t${i}`, 40), text: str(t.text, 200), start: num(t.start, 0, 36000, 0), end: num(t.end, 0, 36000, 3),
     position: ["top", "center", "bottom"].includes(t.position) ? t.position : "bottom", size: ["s", "m", "l"].includes(t.size) ? t.size : "m",
+    font: TEXT_FONTS.includes(t.font) ? t.font : "barlow",
   })).filter((t) => t.text && t.end > t.start);
   const music = e.music && validKey(e.music.key) && e.music.key.startsWith("broll/")
     ? { key: e.music.key, volume: num(e.music.volume, 0, 2, 0.6), start: num(e.music.start, 0, 36000, 0), duck: e.music.duck !== false }
     : null;
+  // Separate sound items (detached clip sound, or sound from any library file) on the audio track.
+  const audios = (Array.isArray(e.audios) ? e.audios : []).slice(0, 100).filter((a) => a && validKey(a.key) && a.key.startsWith("broll/")).map((a, i) => {
+    const duration = num(a.duration, 0, 36000, 0);
+    const inP = num(a.in, 0, duration || 36000, 0);
+    return { id: str(a.id || `a${i}`, 40), key: a.key, duration, in: inP, out: num(a.out, inP + 0.1, duration || 36000, inP + 3), start: num(a.start, 0, 36000, 0),
+      volume: num(a.volume, 0, 2, 1), muted: Boolean(a.muted), fromClip: a.fromClip ? str(a.fromClip, 40) : null };
+  });
   return {
-    version: 1,
+    version: 2,
     format: FORMATS.includes(e.format) ? e.format : "vlog-16x9",
     framing: e.framing === "fill" ? "fill" : "fit",
     title: str(e.title, 140) || null,
     captions: Boolean(e.captions),
     fadeIn: num(e.fadeIn, 0, 5, 0.5), fadeOut: num(e.fadeOut, 0, 5, 0.6),
-    clips, texts, music,
+    clips, texts, music, audios,
     notes: str(e.notes, 2000),
   };
 }

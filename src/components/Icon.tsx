@@ -22,6 +22,16 @@ const PATHS: Record<string, ReactNode> = {
   music: <><path d="M9 18V5l11-2v13" /><circle cx="6.5" cy="18" r="2.5" /><circle cx="17.5" cy="16" r="2.5" /></>,
   split: <><path d="M12 3v18" /><path d="M4 8h5v8H4zM15 8h5v8h-5z" /></>,
   back: <><path d="M10 6l-6 6 6 6" /><path d="M4 12h16" /></>,
+  undo: <><path d="M9 14L4 9l5-5" /><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" /></>,
+  redo: <><path d="M15 14l5-5-5-5" /><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13" /></>,
+  grip: <><circle cx="9" cy="6" r="1.2" /><circle cx="15" cy="6" r="1.2" /><circle cx="9" cy="12" r="1.2" /><circle cx="15" cy="12" r="1.2" /><circle cx="9" cy="18" r="1.2" /><circle cx="15" cy="18" r="1.2" /></>,
+  unlink: <><path d="M9 15l-1.5 1.5a3.5 3.5 0 0 1-5-5L5 9" /><path d="M15 9l1.5-1.5a3.5 3.5 0 0 1 5 5L19 15" /><path d="M8 3v2M3 8h2M16 21v-2M21 16h-2" /></>,
+  link: <><path d="M10 14a3.5 3.5 0 0 0 5 0l3.5-3.5a3.5 3.5 0 0 0-5-5L12 7" /><path d="M14 10a3.5 3.5 0 0 0-5 0l-3.5 3.5a3.5 3.5 0 0 0 5 5L12 17" /></>,
+  transition: <><path d="M4 5l8 7-8 7z" /><path d="M20 5l-8 7 8 7z" /></>,
+  film: <><rect x="3" y="5" width="18" height="14" rx="1.5" /><path d="M7 5v14M17 5v14M3 9.5h4M3 14.5h4M17 9.5h4M17 14.5h4" /></>,
+  wave: <path d="M3 12h2M7 8v8M11 5v14M15 9v6M19 7v10M21 12h0" />,
+  media: <><rect x="3" y="4" width="18" height="16" rx="1.5" /><path d="M3 15l5-5 4 4 3-3 6 6" /><circle cx="15.5" cy="8.5" r="1.5" /></>,
+  inspect: <><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0" /><circle cx="16" cy="6" r="2" /><circle cx="10" cy="12" r="2" /><circle cx="18" cy="18" r="2" /></>,
   reset: <><path d="M4 12a8 8 0 1 0 2.34-5.66" /><path d="M4 4v5h5" /></>,
 };
 export type IconName = keyof typeof PATHS;

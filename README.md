@@ -31,25 +31,27 @@ Job states: `queued` → `preparing` (YT Boy drafting) → `editing` (open in th
 
 ```json
 {
-  "version": 1, "format": "vlog-16x9", "framing": "fit", "title": "Lisbon in a day", "captions": false,
+  "version": 2, "format": "vlog-16x9", "framing": "fit", "title": "Lisbon in a day", "captions": false,
   "fadeIn": 0.5, "fadeOut": 0.6,
-  "clips": [{ "id": "c1", "key": "broll/Lisbon/tram.mp4", "kind": "video", "duration": 12.4, "in": 3.1, "out": 6.3, "volume": 1, "muted": false }],
-  "texts": [{ "id": "t1", "text": "Lisbon in a day", "start": 0, "end": 2.5, "position": "center", "size": "l" }],
+  "clips": [{ "id": "c1", "key": "broll/Lisbon/tram.mp4", "kind": "video", "duration": 12.4, "in": 3.1, "out": 6.3, "volume": 1, "muted": false,
+              "detached": false, "transition": { "type": "fade", "duration": 0.6 } }],
+  "texts": [{ "id": "t1", "text": "Lisbon in a day", "start": 0, "end": 2.5, "position": "center", "size": "l", "font": "anton" }],
+  "audios": [{ "id": "a1", "key": "broll/Lisbon/street.mp4", "duration": 20, "in": 2, "out": 8, "start": 1.5, "volume": 0.8, "muted": false, "fromClip": null }],
   "music": { "key": "broll/Music/song.mp3", "volume": 0.6, "start": 0, "duck": true }
 }
 ```
 
-Clips play in array order from `in` to `out` (seconds in the source). Photos use `kind: "image"` and run for `out - in` seconds. Text times are on the output timeline. `draft.json` keeps YT Boy's original, so the editor can reset to it.
+Clips play in array order from `in` to `out` (seconds in the source). Photos use `kind: "image"` and run for `out - in` seconds. `clip.transition` is the transition **into the next clip** (ffmpeg xfade + acrossfade; types: fade, dissolve, fadeblack, fadewhite, slideleft/right/up/down, squeezeh, wipeleft/right, smoothleft, circleopen/close, radial, zoomin, hblur, pixelize). Its length is capped at half of the shorter neighbour; each transition overlaps the clips, so the video gets shorter by its length. `audios` are separate sounds on the sound track, placed at `start` on the output timeline (a detached clip sound has `fromClip` and its clip has `muted: true, detached: true`). Text fonts: barlow, anton, bebas, archivo, marker, pacifico (Google Fonts TTFs in `worker/fonts`, OFL/Apache). Text times are on the output timeline. Version 1 edits still load (no transitions, sounds or fonts). `draft.json` keeps YT Boy's original, so the editor can reset to it.
 
 ## The editor
 
-- A preview player that plays the timeline as it will render, with the music and text overlays.
-- A timeline with clip thumbnails at a zoom you set. Drag to reorder; click to select and move the playhead.
-- Clip inspector: in and out (typed, or "at playhead"), volume, mute, move earlier or later, duplicate, remove, split at the playhead.
-- Text: add at the playhead, edit the words, start and end, position, size.
-- Video settings: format, framing (whole shot or fill frame), captions, fades, music volume and start, ducking, and reset to YT Boy's draft.
-- Add clips from the library; a music file becomes the music track.
-- Saves itself about a second after each change, and is locked while exporting.
+- Preview player that plays the timeline with music, sounds, text overlays and an approximate transition preview (the export renders them exactly).
+- Tracks: **Text**, **Video**, **Sound** (each clip's own sound, linked, plus separate sounds) and **Music**. Drag the ruler to scrub.
+- Drag and drop with a finger or a mouse: hold a clip, then drag to reorder; drag clip, text and sound edges to trim; drag texts and sounds to move them (they snap to cuts, other texts and the playhead).
+- Panel tabs: **Inspect** (the selected clip, cut, text or sound, or the video settings), **Media** (library: drag a file by its grip onto a track, or tap +), **Transitions** (a library of 18 animated tiles: drag onto a ◆ between clips, or tap a ◆ then a tile; use one on all cuts).
+- Clip sound: volume, mute, **Detach sound** (becomes its own item on the sound track) and Re-attach.
+- Text: words, font (6 Google fonts), start/end, position, size.
+- Undo/redo (Ctrl+Z, Ctrl+Shift+Z), Space plays, S splits, Delete removes. Saves itself about a second after each change; locked while exporting.
 
 ## YT Boy routine
 
@@ -81,8 +83,8 @@ npm run build      # static export to dist/
 npm run deploy     # build and publish dist/ to the gh-pages branch
 ```
 
-Worker scripts read `worker/.env` (`YQ_API`, `YQ_TOKEN`: the render token, never committed). Text overlays use Barlow SemiBold (`worker/fonts`, SIL OFL).
+Worker scripts read `worker/.env` (`YQ_API`, `YQ_TOKEN`: the render token, never committed). Text overlays use the Google fonts in `worker/fonts` (licences next to them).
 
 ## Design
 
-Hallmark, Darkroom theme (app-screen scope), Google Fonts: Sofia Sans Extra Condensed for headings and controls, Barlow for the UI.
+Darkroom theme (dark, amber). Google Fonts: Bricolage Grotesque for headings, Figtree for the UI; overlay fonts Barlow, Anton, Bebas Neue, Archivo Black, Permanent Marker, Pacifico.

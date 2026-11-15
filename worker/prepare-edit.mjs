@@ -28,6 +28,25 @@ if (saveFile) {
   process.exit(0);
 }
 
+async function listFiles(prefix, acc = []) {
+  const r = await call(`/broll?prefix=${encodeURIComponent(prefix)}`);
+  acc.push(...r.files.map((f) => f.key));
+  for (const f of r.folders) await listFiles(f.prefix, acc);
+  return acc;
+}
+async function resolveMoved(keys) {
+  if (!keys.some((k) => k.startsWith("broll/_inbox/"))) return [...new Set(keys)];
+  const all = await listFiles("broll/").catch(() => null);
+  if (!all) return [...new Set(keys)];
+  const have = new Set(all);
+  const sortedByName = new Map(all.filter((k) => !k.startsWith("broll/_inbox/")).map((k) => [k.split("/").pop(), k]));
+  const out = keys.map((k) => {
+    if (have.has(k) || !k.startsWith("broll/_inbox/")) return k;
+    return sortedByName.get(k.split("/").pop().replace(/^[0-9a-f]{6}-/, "")) || k;
+  });
+  return [...new Set(out)];
+}
+
 const argMax = Number(argVal("--max")) || null;
 const argTitle = argVal("--title") || null;
 const argType = argVal("--type") || null;
@@ -45,14 +64,19 @@ try {
   await ctx.patch({ status: "preparing", stage: "placing clips", progress: 0.1, phase: "draft", error: null, logLine: "draft started",
     ...(title && !job.title ? { title } : {}), ...(type && !job.type ? { type } : {}), ...(target && !job.maxSeconds ? { maxSeconds: target } : {}) });
 
-  const urls = await sign(job.clips);
+  // The organizer moves broll/_inbox/<hex>-name to broll/<Folder>/name, so a job can list stale inbox keys
+  // (and both copies of one clip). Point inbox keys at their sorted copy and drop duplicates.
+  const jobClips = await resolveMoved(job.clips);
+  const urls = await sign(jobClips);
   const items = [];
-  for (const [i, key] of job.clips.entries()) {
-    if (!urls[key]) throw new Error(`clip not found: ${key}`);
-    const info = await probe(ctx.run, urls[key]).catch((e) => { throw new Error(`can’t read ${key.split("/").pop()}: ${e.message.slice(0, 120)}`); });
-    items.push({ key, ...info });
-    await ctx.patch({ progress: 0.1 + 0.7 * ((i + 1) / job.clips.length), stage: `reading clip ${i + 1} of ${job.clips.length}` });
+  const skipped = [];
+  for (const [i, key] of jobClips.entries()) {
+    const info = urls[key] ? await probe(ctx.run, urls[key]).catch((e) => ({ error: e.message.slice(0, 120) })) : { error: "not found" };
+    if (info.error) skipped.push(key.split("/").pop());
+    else items.push({ key, ...info });
+    await ctx.patch({ progress: 0.1 + 0.7 * ((i + 1) / jobClips.length), stage: `reading clip ${i + 1} of ${jobClips.length}` });
   }
+  if (skipped.length) await ctx.patch({ logLine: `skipped unreadable clips: ${skipped.join(", ")}` });
   const visuals = items.filter((x) => x.kind === "video" || x.kind === "image");
   const audio = items.find((x) => x.kind === "audio");
   if (!visuals.length) throw new Error("no video or image clips in this job");

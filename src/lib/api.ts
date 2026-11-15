@@ -1,10 +1,52 @@
 export type JobStatus = "queued" | "preparing" | "editing" | "exporting" | "running" | "cancelling" | "done" | "failed";
 
 /** The timeline YT Boy drafts and the user edits (jobs/<id>/edit.json). Times are seconds. */
-export type EditClip = { id: string; key: string; kind: "video" | "image"; duration: number; in: number; out: number; volume: number; muted: boolean };
-export type EditText = { id: string; text: string; start: number; end: number; position: "top" | "center" | "bottom"; size: "s" | "m" | "l" };
+export type TransitionId =
+  | "fade" | "dissolve" | "fadeblack" | "fadewhite" | "slideleft" | "slideright" | "slideup" | "slidedown"
+  | "wipeleft" | "wiperight" | "circleopen" | "circleclose" | "zoomin" | "hblur" | "pixelize" | "radial" | "smoothleft" | "squeezeh";
+export const TRANSITIONS: { id: TransitionId; label: string; group: "Fades" | "Motion" | "Shapes" | "Effects" }[] = [
+  { id: "fade", label: "Crossfade", group: "Fades" },
+  { id: "dissolve", label: "Dissolve", group: "Fades" },
+  { id: "fadeblack", label: "Dip to black", group: "Fades" },
+  { id: "fadewhite", label: "Dip to white", group: "Fades" },
+  { id: "slideleft", label: "Slide left", group: "Motion" },
+  { id: "slideright", label: "Slide right", group: "Motion" },
+  { id: "slideup", label: "Slide up", group: "Motion" },
+  { id: "slidedown", label: "Slide down", group: "Motion" },
+  { id: "squeezeh", label: "Squeeze", group: "Motion" },
+  { id: "wipeleft", label: "Wipe left", group: "Shapes" },
+  { id: "wiperight", label: "Wipe right", group: "Shapes" },
+  { id: "smoothleft", label: "Soft wipe", group: "Shapes" },
+  { id: "circleopen", label: "Circle open", group: "Shapes" },
+  { id: "circleclose", label: "Circle close", group: "Shapes" },
+  { id: "radial", label: "Clock wipe", group: "Shapes" },
+  { id: "zoomin", label: "Zoom in", group: "Effects" },
+  { id: "hblur", label: "Blur", group: "Effects" },
+  { id: "pixelize", label: "Pixelate", group: "Effects" },
+];
+export const transitionLabel = (id: TransitionId) => TRANSITIONS.find((x) => x.id === id)?.label ?? id;
+export type EditTransition = { type: TransitionId; duration: number };
+
+export type FontId = "barlow" | "anton" | "bebas" | "marker" | "pacifico" | "archivo";
+export const TEXT_FONTS: { id: FontId; label: string; css: string }[] = [
+  { id: "barlow", label: "Barlow", css: "600 1em 'Barlow'" },
+  { id: "anton", label: "Anton", css: "400 1em 'Anton'" },
+  { id: "bebas", label: "Bebas Neue", css: "400 1em 'Bebas Neue'" },
+  { id: "archivo", label: "Archivo Black", css: "400 1em 'Archivo Black'" },
+  { id: "marker", label: "Permanent Marker", css: "400 1em 'Permanent Marker'" },
+  { id: "pacifico", label: "Pacifico", css: "400 1em 'Pacifico'" },
+];
+export const fontFamily = (id?: FontId) => {
+  const f = TEXT_FONTS.find((x) => x.id === id) || TEXT_FONTS[0];
+  return { fontFamily: `'${f.label}', sans-serif`, fontWeight: f.id === "barlow" ? 600 : 400 };
+};
+
+export type EditClip = { id: string; key: string; kind: "video" | "image"; duration: number; in: number; out: number; volume: number; muted: boolean; detached?: boolean; transition?: EditTransition | null };
+export type EditText = { id: string; text: string; start: number; end: number; position: "top" | "center" | "bottom"; size: "s" | "m" | "l"; font?: FontId };
+/** A separate sound on the audio track: detached clip sound, or the sound of any library file. */
+export type EditAudio = { id: string; key: string; duration: number; in: number; out: number; start: number; volume: number; muted: boolean; fromClip?: string | null };
 export type Edit = {
-  version: 1;
+  version: 1 | 2;
   format: FormatId;
   framing: "fit" | "fill";
   title: string | null;
@@ -13,11 +55,29 @@ export type Edit = {
   fadeOut: number;
   clips: EditClip[];
   texts: EditText[];
+  audios?: EditAudio[];
   music: { key: string; volume: number; start: number; duck: boolean } | null;
   notes?: string;
 };
 export const clipLen = (c: EditClip) => Math.max(0, c.out - c.in);
-export const editLength = (e: Edit) => e.clips.reduce((a, c) => a + clipLen(c), 0);
+/** Transition length from clip i into clip i+1 (0 = cut). Same rule as worker/render-edit.mjs. */
+export function transitionLengths(clips: EditClip[]) {
+  const len = (c: EditClip) => Math.max(0.1, c.out - c.in);
+  return clips.map((c, i) => {
+    if (i === clips.length - 1 || !c.transition || !c.transition.type) return 0;
+    const d = Math.min(Number(c.transition.duration) || 0.6, len(c) / 2 - 0.05, len(clips[i + 1]) / 2 - 0.05);
+    return d >= 0.1 ? Math.round(d * 100) / 100 : 0;
+  });
+}
+/** Where each clip starts on the output timeline (transitions overlap neighbours). */
+export function clipStarts(clips: EditClip[]) {
+  const d = transitionLengths(clips);
+  const s: number[] = [];
+  let acc = 0;
+  clips.forEach((c, i) => { s.push(acc); acc += clipLen(c) - d[i]; });
+  return s;
+}
+export const editLength = (e: Edit) => { const d = transitionLengths(e.clips); return Math.max(0, e.clips.reduce((a, c, i) => a + clipLen(c) - d[i], 0)); };
 
 export type Job = {
   id: string;

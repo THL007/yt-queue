@@ -4,6 +4,8 @@
 // Per clip: its in/out, volume or mute, framed to the format ("fit" = whole shot over a blurred copy,
 // "fill" = crop). Then: text overlays at their times and positions, music bed (volume, start offset,
 // ducked under clip sound), burned captions when asked and there is speech, fades, -14 LUFS.
+// v2: transitions between clips (clip.transition = into the next clip, ffmpeg xfade + acrossfade),
+// separate sound items on the audio track (edit.audios: placed at `start`, trimmed in/out), text fonts.
 // Exit codes: 0 done, 1 failed, 3 cancelled (the user deleted the job: stop, don't retry).
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { call, captionFile, die, download, FPS, HERE, jobContext, join, PRESETS, probe, upload } from "./lib.mjs";
@@ -14,7 +16,20 @@ const keep = process.argv.includes("--keep");
 const work = join(HERE, "..", "work", jobId);
 const ctx = jobContext(jobId, work);
 const { run, patch } = ctx;
-const FONT = join(HERE, "fonts", "Barlow-SemiBold.ttf");
+const FONTS = {
+  barlow: "Barlow-SemiBold.ttf", anton: "Anton-Regular.ttf", bebas: "BebasNeue-Regular.ttf",
+  marker: "PermanentMarker-Regular.ttf", pacifico: "Pacifico-Regular.ttf", archivo: "ArchivoBlack-Regular.ttf",
+};
+const fontFile = (id) => join(HERE, "fonts", FONTS[id] || FONTS.barlow);
+// Length of the transition from clip i into clip i+1 (0 = cut). Same rule as the editor.
+function transitionLengths(clips) {
+  const len = (c) => Math.max(0.1, c.out - c.in);
+  return clips.map((c, i) => {
+    if (i === clips.length - 1 || !c.transition || !c.transition.type) return 0;
+    const d = Math.min(Number(c.transition.duration) || 0.6, len(c) / 2 - 0.05, len(clips[i + 1]) / 2 - 0.05);
+    return d >= 0.1 ? Math.round(d * 100) / 100 : 0;
+  });
+}
 
 // Wrap overlay text into lines that fit the frame (drawtext does not wrap).
 function wrap(text, maxChars) {
@@ -45,7 +60,8 @@ try {
   mkdirSync(work, { recursive: true });
 
   // Download each source once.
-  const keys = [...new Set([...edit.clips.map((c) => c.key), ...(edit.music ? [edit.music.key] : [])])];
+  const audios = (edit.audios || []).filter((a) => !a.muted && a.volume > 0 && a.out > a.in);
+  const keys = [...new Set([...edit.clips.map((c) => c.key), ...audios.map((a) => a.key), ...(edit.music ? [edit.music.key] : [])])];
   const files = {};
   for (const [i, key] of keys.entries()) {
     const ext = (key.match(/\.[A-Za-z0-9]{1,5}$/) || [".bin"])[0].toLowerCase();
@@ -81,11 +97,56 @@ try {
     await patch({ progress: 0.24 + 0.46 * ((i + 1) / edit.clips.length), stage: `cutting clip ${i + 1} of ${edit.clips.length}` });
   }
 
-  await patch({ stage: "joining", progress: 0.72 });
-  const list = join(work, "list.txt");
-  writeFileSync(list, segs.map((s) => `file '${s.replace(/'/g, "'\\''")}'`).join("\n"));
-  const joined = join(work, "joined.mp4");
-  await run("ffmpeg", ["-y", "-hide_banner", "-f", "concat", "-safe", "0", "-i", list, "-c", "copy", joined]);
+  await patch({ stage: "joining", progress: 0.7 });
+  const D = transitionLengths(edit.clips);
+  let joined = join(work, "joined.mp4");
+  if (!D.some((d) => d > 0)) {
+    const list = join(work, "list.txt");
+    writeFileSync(list, segs.map((s) => `file '${s.replace(/'/g, "'\\''")}'`).join("\n"));
+    await run("ffmpeg", ["-y", "-hide_banner", "-f", "concat", "-safe", "0", "-i", list, "-c", "copy", joined]);
+  } else {
+    // One pass: xfade + acrossfade where a transition is set, concat where it is a cut.
+    const lens = [];
+    for (const sg of segs) lens.push((await probe(run, sg)).duration);
+    const parts = segs.map((_, i) => `[${i}:v]settb=AVTB,fps=${FPS},format=yuv420p[v${i}];[${i}:a]aresample=48000,aformat=channel_layouts=stereo[a${i}]`);
+    let v = "[v0]", a = "[a0]", acc = lens[0];
+    for (let i = 1; i < segs.length; i++) {
+      const d = D[i - 1];
+      const vo = `[vx${i}]`, ao = `[ax${i}]`;
+      if (d > 0) {
+        parts.push(`${v}[v${i}]xfade=transition=${edit.clips[i - 1].transition.type}:duration=${d}:offset=${(acc - d).toFixed(3)}${vo}`);
+        parts.push(`${a}[a${i}]acrossfade=d=${d}:c1=tri:c2=tri${ao}`);
+        acc += lens[i] - d;
+      } else {
+        parts.push(`${v}${a}[v${i}][a${i}]concat=n=2:v=1:a=1${vo}${ao}`);
+        acc += lens[i];
+      }
+      v = vo; a = ao;
+    }
+    await run("ffmpeg", ["-y", "-hide_banner", ...segs.flatMap((sg) => ["-i", sg]), "-filter_complex", parts.join(";"),
+      "-map", v, "-map", a, "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-c:a", "aac", "-b:a", "192k", "-ar", "48000", joined]);
+  }
+  // Separate sound items: each placed at its start on the timeline, mixed over the clip sound.
+  if (audios.length) {
+    await patch({ stage: "mixing the audio track", progress: 0.73 });
+    const ins = [], fl = [], labels = [];
+    let n = 1;
+    for (const it of audios) {
+      const info = await probe(run, files[it.key]);
+      if (!(info.hasAudio || info.kind === "audio")) continue;
+      ins.push("-ss", it.in.toFixed(3), "-t", (it.out - it.in).toFixed(3), "-i", files[it.key]);
+      const ms = Math.round(it.start * 1000);
+      fl.push(`[${n}:a]aresample=48000,aformat=channel_layouts=stereo,volume=${it.volume},adelay=${ms}|${ms}[s${n}]`);
+      labels.push(`[s${n}]`);
+      n++;
+    }
+    if (labels.length) {
+      const mixed = join(work, "joined-mix.mp4");
+      fl.push(`[0:a]${labels.join("")}amix=inputs=${labels.length + 1}:duration=first:normalize=0[a]`);
+      await run("ffmpeg", ["-y", "-hide_banner", "-i", joined, ...ins, "-filter_complex", fl.join(";"), "-map", "0:v", "-map", "[a]", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", mixed]);
+      joined = mixed;
+    }
+  }
   const dur = (await probe(run, joined)).duration;
 
   // Video filters: fades, text overlays, captions.
@@ -107,7 +168,7 @@ try {
     lines.forEach((line, j) => {
       const tf = join(work, `text-${i}-${j}.txt`);
       writeFileSync(tf, line);
-      vf.push(`drawtext=fontfile='${FONT}':textfile='${tf}':expansion=none:fontsize=${size}:fontcolor=white:` +
+      vf.push(`drawtext=fontfile='${fontFile(t.font)}':textfile='${tf}':expansion=none:fontsize=${size}:fontcolor=white:` +
         `box=1:boxcolor=black@0.45:boxborderw=${pad}:x=(w-text_w)/2:y=${y0 + j * lineH + pad}:enable='${enable}'`);
     });
   }
